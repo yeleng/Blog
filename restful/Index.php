@@ -68,6 +68,7 @@ class Restful
             throw new Exception('请求方法不被允许',405);
         }
         $body =array();
+<<<<<<< HEAD
         $body = $this -> _getBodyParams(); //这里拿的是从body拿过来的数据,json格式，直接拿是拿不到的,
         if($this -> _id == 1){
         $name = $this -> _userLogin($body['username'],$body['password']);
@@ -76,6 +77,14 @@ class Restful
             'name' => $name['username'],
             'token' => $jwt,
         ]; //之前就已经定好返回的为json格式
+=======
+        $body = $this -> _getBodyParams(); //josn格式，直接拿是拿不到的
+        if($this ->_setupResource() == 1){
+        $name = $this -> _userLogin($body['username'],$body['password']);
+        $jwt = $this -> encode($name);
+        echo $jwt;
+        return $jwt;
+>>>>>>> 029d41411ae74c5a9e851de0fb347cd49b25752c
         }else
         return $this -> _user -> register($body['username'],$body['password'],$body['email'],$body['name'],$body['intro'],$body['sex']); //这里是注册
     }
@@ -100,6 +109,7 @@ class Restful
             }else{
                 return $this -> _handleArticleView(); //返回一个单独的文章
             }
+<<<<<<< HEAD
             case 'POST':
             if($this -> check())
             return $this -> _handleArticleCreate();
@@ -116,6 +126,19 @@ class Restful
             else
             print_r('验证出错');
             
+=======
+            case 'POST':{
+            if(!$restful -> decode(apache_request_headers();,'6'))return 0;
+            
+            return $this -> _handleArticleCreate();
+            }case 'DELETE':{
+            if(!$restful -> decode(apache_request_headers();,'6'))return 0;
+            return $this -> _handleArticleDelete();
+            }case 'PUT':{
+            if(!$restful -> decode(apache_request_headers();,'6'))return 0;
+            return $this -> _handleArticleEdit();
+            }
+>>>>>>> 029d41411ae74c5a9e851de0fb347cd49b25752c
         }
     }
     //添加文章
@@ -230,11 +253,16 @@ class Restful
         return $jwt . '.' . self::signature($jwt, $key, $alg); //这里jwt包括前两个
     }
     //alg要使用hash算法的名字,input为数据,key为密钥
+<<<<<<< HEAD
    public  function signature($input,$key,$alg='sha1')
+=======
+   public  function signature($input,$key,$alg)
+>>>>>>> 029d41411ae74c5a9e851de0fb347cd49b25752c
     {
    // return $input1.$key.$alg; 
     return hash_hmac($alg, $input, $key);
     }
+<<<<<<< HEAD
     public function decode($jwt,$key='6')
     {
         $arr = explode(" ",$jwt);
@@ -265,10 +293,43 @@ class Restful
     $jwt=$header['Authorization'];
     return $this -> decode($jwt);
     }
+=======
+    public function decode($jwt,$key)
+    {
+        $tokens = explode('.', $jwt);//按照.分隔开
+        
+        $key    = md5($key);
+        if (count($tokens) != 3)
+            return false;
+
+        list($header64, $payload64, $sign) = $tokens; //分开放入
+
+        $header = json_decode(base64_decode($header64), JSON_OBJECT_AS_ARRAY);
+        if (empty($header['alg']))
+            return false;
+
+        if (self::signature($header64 . '.' . $payload64, $key, $header['alg']) !== $sign)
+            return false;
+
+        $payload = json_decode(base64_decode($payload64), JSON_OBJECT_AS_ARRAY);
+
+        $time = $_SERVER['REQUEST_TIME'];
+        if (isset($payload['iat']) && $payload['iat'] > $time)
+            return false;
+
+        if (isset($payload['exp']) && $payload['exp'] < $time)
+            return false;
+        return $payload;
+    }
+>>>>>>> 029d41411ae74c5a9e851de0fb347cd49b25752c
 }
 $article = new Article($pdo);
 $user = new User($pdo);
 $restful = new Restful($user,$article);
 $restful -> run();
+<<<<<<< HEAD
 //获取请求头的数据Authorization
+=======
+ //获取请求头的数据Authorization
+>>>>>>> 029d41411ae74c5a9e851de0fb347cd49b25752c
 ?>
