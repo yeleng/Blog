@@ -21,7 +21,7 @@ class Article
      * 
      */
     public function create($author,$title,$content)
-    {
+    {  
         if(empty($title)){
             throw new Exception('文章标题不能为空',ErrorCode::ARTICLE_TITLE_CANNOT_EMPTY);
         }
@@ -36,7 +36,6 @@ class Article
         $stmt -> bindParam(':author',$author);
         $stmt -> execute();
         $man = $stmt -> fetch(PDO::FETCH_ASSOC);
-
         $sql = 'INSERT INTO `main_info`(`title`,`content`,`author`,`time`,`authorId`) VALUE (:title,:content,:author,:time,:id)';
         $time = date('Y-m-d',time());
         $stmt = $this -> _db -> prepare($sql);
@@ -49,10 +48,10 @@ class Article
             throw new Exception('发表文章失败',ErrorCode::ARTICLE_CREATE_FAIL);
         }
             return ['articleId' => $this -> _db -> lastInsertId(),
-                    'title' => $title,
-                    'content' => $content,
                     'author' => $author,
-                    'authorId' => $man['id']
+                    'authorId' => $man['id'],
+                    'title' => $title,
+                    'content' => $content
             ];                                                                                                                                                                                                                                                       
     }
     /**编辑文章
@@ -109,7 +108,7 @@ class Article
     {
         $article = $this -> view($articleId);
         if($article['author']!=$author){
-            throw new Expection('您权限不足', PERMISSION_DENIED);
+            throw new Exception('您权限不足',ErrorCode::PERMISSION_DENIED);
         }
         $sql = 'SELECT * FROM `main_info` WHERE `id`=:articleId';
         $stmt =$this -> _db ->prepare($sql);
@@ -135,7 +134,7 @@ class Article
         }
         $limit = ($page-1)*$size;
         $limit = $limit < 0 ? 0:$limit;
-        $sql = 'SELECT * FROM `main_info` WHERE `authorId`=:authorid LIMIT '.$limit.','.$size;
+        $sql = 'SELECT * FROM `main_info` WHERE `authorid`=:authorid LIMIT '.$limit.','.$size;
         //这个只能根据键查找
         //从limit开始(不算limit)的后offset个
         $stmt= $this -> _db -> prepare($sql);

@@ -14,6 +14,10 @@ class Restful
 
     private $_resourceName; //请求的资源名称
     
+    private $authorid;
+
+    private $author;
+
     private $_id;
     //允许资源列表
     private $_allowResources = ['articles','users'];
@@ -46,7 +50,7 @@ class Restful
     { //只有一个公共的入口
         //初始化
         try{
-        $this -> _setupRequestMethod(); //run下的判断method是否合理
+        $this -> _setupRequestMethod(); //下的判断method是否合理
         $this -> _setupResource();      //判断articles/id, 这个id资源
         if($this -> _resourceName =='users'){ //因为只有2个合法的方法
             return $this -> _json($this -> _handleUser());
@@ -59,23 +63,33 @@ class Restful
     }
 
     private function _handleUser()
-    {
-        if($this -> _requestMethod !='POST'){ //用户注册
+    { //0是注册，1是登录
+        if($this -> _requestMethod !='POST'){ //用户注册或登录
             throw new Exception('请求方法不被允许',405);
         }
         $body =array();
-        $body = $this -> _getBodyParams(); //josn格式，直接拿是拿不到的
+        $body = $this -> _getBodyParams(); //这里拿的是从body拿过来的数据,json格式，直接拿是拿不到的,
+        if($this -> _id == 1){
+        $name = $this -> _userLogin($body['username'],$body['password']);
+        $jwt=$this -> encode($name['username']); //给一个签发者的名字,获得20分钟专属token
+        return [ 
+            'name' => $name['username'],
+            'token' => $jwt,
+        ]; //之前就已经定好返回的为json格式
+        }else
         return $this -> _user -> register($body['username'],$body['password'],$body['email'],$body['name'],$body['intro'],$body['sex']); //这里是注册
     }
+
     private function _getBodyParams()
     { //获取请求体
-        $raw = file_get_contents('php://input'); //php的文件流
+        $raw = file_get_contents('php://input'); //php的文件流,这里获取的$raw是从url的
         if(empty($raw)){
             throw new Exception('请求参数错误',400);
         }
         return json_decode($raw,true); //这里传入的为json格式，但是使用的时候需要转换为php数组,且第二个变量一定要为true
         //TRUE时返回数组，FALSE时返回对象 
     }
+    
     private function _handleArticle()
     {
         switch($this ->_requestMethod)
@@ -87,21 +101,31 @@ class Restful
                 return $this -> _handleArticleView(); //返回一个单独的文章
             }
             case 'POST':
+            if($this -> check())
             return $this -> _handleArticleCreate();
+            else
+            print_r('验证出错');
             case 'DELETE':
+            if($this -> check())
             return $this -> _handleArticleDelete();
+            else
+            print_r('验证出错');
             case 'PUT':
+            if($this -> check())
             return $this -> _handleArticleEdit();
+            else
+            print_r('验证出错');
             
         }
     }
     //添加文章
      private function _handleArticleCreate()
     {
+        $body =array();
         $body = $this -> _getBodyParams();
-        $user = $this -> _userLogin($_SERVER['PHP_AUTH_USER'],$this -> _user -> _md5($_SERVER['PHP_AUTH_PW']));
+        //$user = $this -> _userLogin($_SERVER['PHP_AUTH_USER'],$this -> _user -> _md5($_SERVER['PHP_AUTH_PW']));
         try{
-            $article = $this -> _article -> create($_SERVER['PHP_AUTH_USER'],$body['title'],$body['content']);
+            $article = $this -> _article -> create($this -> author ,$body['title'],$body['content']);
             return $article;
         } catch (Exception $e){
             throw new Exception('请求方法不被允许',405);
@@ -111,9 +135,9 @@ class Restful
     private function _handleArticleDelete()
     {
         try{
-        $user = $this -> _userLogin($_SERVER['PHP_AUTH_USER'],$this -> _user -> _md5($_SERVER['PHP_AUTH_PW']));
+       // $user = $this -> _userLogin($_SERVER['PHP_AUTH_USER'],$this -> _user -> _md5($_SERVER['PHP_AUTH_PW']));
         $article =$this -> _article -> view($this -> _id);
-        $result = $this ->_article -> delete($article['id'],$user['username']);
+        $result = $this ->_article -> delete($article['id'],$this -> author);
         return $result;
         }catch (Exception $e){
             $this -> _json(['error'=>$e->getMessage(),'code'=>$e->getCode()]);
@@ -123,9 +147,9 @@ class Restful
      private function _handleArticleEdit()
     {
         try{
-        $user = $this -> _userLogin($_SERVER['PHP_AUTH_USER'],$this -> _user -> _md5($_SERVER['PHP_AUTH_PW']));
+        $body = array();
         $body = $this -> _getBodyParams();
-        $result = $this ->_article -> edit($this -> _id,$body['content'],$body['title'],$_SERVER['PHP_AUTH_USER']);
+        $result = $this ->_article -> edit($this -> _id,$body['content'],$body['title'],$this -> author);
         return $result;
         }catch (Exception $e){
             $this -> _json(['error'=>$e->getMessage(),'code'=>$e->getCode()]);
@@ -142,7 +166,7 @@ class Restful
         }
     }
     //查找文章(列表')
-     private function _handleArticleList()
+    public function _handleArticleList()
     {
         try{
         $result = $this ->_article ->getList($_GET['authorid']);
@@ -192,9 +216,59 @@ class Restful
             $this -> _id=$params[2];
         }
     }
+    public function encode($issuer,$key='6',$alg = 'sha1') //这里alg是随便定的，为signature的计算方式
+    {
+        
+        $payload=[
+            'iss' => $issuer, //签发者
+            'iat' => $_SERVER['REQUEST_TIME'], //什么时候签发的
+            'exp' => $_SERVER['REQUEST_TIME'] + 7200 //过期时间
+        ];
+        //payload包含签发者，签发时间，签发过期时间
+        $key = md5($key);
+        $jwt = base64_encode(json_encode(['typ' => 'JWT', 'alg' => $alg])) . '.' . base64_encode(json_encode($payload));
+        return $jwt . '.' . self::signature($jwt, $key, $alg); //这里jwt包括前两个
+    }
+    //alg要使用hash算法的名字,input为数据,key为密钥
+   public  function signature($input,$key,$alg='sha1')
+    {
+   // return $input1.$key.$alg; 
+    return hash_hmac($alg, $input, $key);
+    }
+    public function decode($jwt,$key='6')
+    {
+        $arr = explode(" ",$jwt);
+        $jwt = $arr[1];
+        $tokens = explode('.',$jwt);//按照.分隔开
+        
+        $key = md5($key);
+        if (count($tokens) != 3)
+            return false;
+        list($header64, $payload64, $sign) = $tokens; //分开放入
+        $header = json_decode(base64_decode($header64), JSON_OBJECT_AS_ARRAY);
+        if (empty($header['alg']))
+            return false;
+        if (self::signature($header64 . '.' . $payload64, $key) !== $sign)
+            return false;
+       $payload = json_decode(base64_decode($payload64), JSON_OBJECT_AS_ARRAY);
+        $time = $_SERVER['REQUEST_TIME'];
+        if (isset($payload['iat']) && $payload['iat'] > $time)
+            return false;
+        if (isset($payload['exp']) && $payload['exp'] < $time)
+            return false;
+        $this ->author = $payload['iss'];
+        return $payload;
+    }
+    public function check(){
+    $header=apache_request_headers();
+    $header=getallheaders();
+    $jwt=$header['Authorization'];
+    return $this -> decode($jwt);
+    }
 }
 $article = new Article($pdo);
 $user = new User($pdo);
 $restful = new Restful($user,$article);
 $restful -> run();
+//获取请求头的数据Authorization
 ?>

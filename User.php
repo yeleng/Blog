@@ -25,12 +25,13 @@ class User
         }
         $sql = 'SELECT * FROM `zhuche` WHERE `username` =:username AND `password` =:password';
         $stmt = $this -> _db ->prepare($sql);
+        $password = $this->_md5($password);
         $stmt -> bindParam(':username',$username);
         $stmt -> bindParam(':password',$password);
         $stmt -> execute();
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         if(empty($user)){
-            throw new Exception('用户名或密码错误啊',ErrorCode::USERNAME_OR_PASSWORD_INVALID);
+            throw new Exception('用户名或密码错误',ErrorCode::USERNAME_OR_PASSWORD_INVALID);
         }
         unset($user['password']); //删除这个数组中的value=password的key
         return $user;

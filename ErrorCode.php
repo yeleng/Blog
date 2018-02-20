@@ -2,6 +2,7 @@
 header("Content-Type:text/html;charset=UTF-8");
 class ErrorCode
 {
+    const ARTICLE_TITLE_CANNOT_EMPTY=13;  //文章标题不能为空
     const USERNAME_CANNNOT_EMPTY = 1;  //用户名不能为空
     const USERNAME_EXISTS = 2; //用户名已存在
     const PASSWORD_CANNOT_EMPTY = 3;  //密码不能为空
@@ -15,5 +16,5 @@ class ErrorCode
     const PERMISSION_DENIED=10; //无权操作	
     const ARTICLE_EDIT_FAIL=11; //文章编辑失败
     const ARTICLE_DELETE_FALI = 12; //文章删除失败
-    
+    const ARTICLE_CREATE_FAIL =14; //文章创建失败
 }
