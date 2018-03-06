@@ -2,6 +2,8 @@
 header("Content-Type:text/html;charset=UTF-8");
 require "../User.php";
 require "../Article.php";
+require "../Comment.php";
+require "../Image.php";
 $pdo = require '../Db.php';
 
 class Restful
@@ -10,17 +12,21 @@ class Restful
  
     private $_article;
 
+    private $_comment;
+    
     private $_requestMethod;
 
     private $_resourceName; //请求的资源名称
     
     private $authorid;
 
+    private $_image;
+
     private $author;
 
     private $_id;
     //允许资源列表
-    private $_allowResources = ['articles','users'];
+    private $_allowResources = ['articles','users','comment','image'];
     //允许请求的方法
     private $_allowRequestMethods =['GET','POST','PUT','DELETE','OPTIONS'];
     
@@ -36,11 +42,13 @@ class Restful
         405 => 'Method Not Allowed',
         500 => 'Server Internal Error' //服务器错误
     ];
-    
-    public function __construct(User $_user,Article $_article)
+    //刚开始全部实例化时候传入的参数
+    public function __construct(User $_user,Article $_article,Comment $_comment,Image $_image)
     {
         $this -> _user = $_user;
         $this -> _article = $_article;
+        $this -> _comment =$_comment;
+        $this -> _image =$_image;
     }
     //对于线上的 API 必须保证所有接口正常且关闭所有的错误信息 => error_reporting(0)
     //接口开发，不建议使用框架开发
@@ -56,19 +64,70 @@ class Restful
             return $this -> _json($this -> _handleUser());
         }else if($this -> _resourceName == 'articles'){
             return $this -> _json($this -> _handleArticle());
-        }
-        } catch (Exception $e){  //throw 这个类型为e 其有2个方法
+        }else if($this -> _resourceName == 'comment'){
+             return $this -> _json($this -> _handleComment());
+        }else if($this -> _resourceName == 'image'){
+             return $this -> _json($this -> _handleImage());
+        }}catch (Exception $e){  //throw 这个类型为e 其有2个方法
             $this -> _json(['error'=>$e->getMessage(),'code'=>$e->getCode()]);
         }
     }
 
-    private function _handleUser()
-    { //0是注册，1是登录
+      private function _handleComment(){
+         switch($this ->_requestMethod)
+        {
+            case 'GET':
+            if(empty($this -> _id)){
+                print_r('文章查看错误');
+            }else{
+                return $this -> _handleCommentList();//当ID为0就是返回一个列表的文章
+            }
+            case 'POST':
+            if($this -> check()){
+            if(empty($this -> _id)){
+                print_r('操作错误');
+            }
+            if($this -> _id == 1){
+            return $this -> _handleCommentCreate();
+            }else if($this -> _id == 2){
+            return $this -> _handleCommentCreate2();
+            }
+            }else
+            print_r('身份验证出错');
+        }
+      }
+
+      private function _handleCommentCreate(){//传入4个参数,被评论文章ID,评论内容,评论作者ID,被评论作者ID
+        $body =array();
+        $body = $this -> _getBodyParams(); 
+        try{
+            $comment= $this -> _comment -> commentCreate($body['to_articleId'] ,$body['content'],$this -> author,$body['to_authorId']);
+            return $comment;
+        } catch (Exception $e){
+            throw new Exception('请求方法不被允许',405);
+        }
+      }
+
+      private function _handleCommentCreate2(){//传入4个参数,被评论文章ID,评论内容,评论作者ID,被评论作者ID
+        $body =array();
+        $body = $this -> _getBodyParams(); 
+        try{
+            $comment= $this -> _comment -> commentCreate2($body['to_commentId'],$body['content'],$this -> author,$body['to_authorId']);
+            return $comment;
+        } catch (Exception $e){
+            throw new Exception('请求方法不被允许',405);
+        }
+      }
+       private function _handleCommontEdit(){
+        $body =array();
+        $body = $this -> _getBodyParams();
+      }
+
+      private function _handleUser(){ //0是注册，1是登录
         if($this -> _requestMethod !='POST'){ //用户注册或登录
             throw new Exception('请求方法不被允许',405);
         }
         $body =array();
-<<<<<<< HEAD
         $body = $this -> _getBodyParams(); //这里拿的是从body拿过来的数据,json格式，直接拿是拿不到的,
         if($this -> _id == 1){
         $name = $this -> _userLogin($body['username'],$body['password']);
@@ -77,14 +136,6 @@ class Restful
             'name' => $name['username'],
             'token' => $jwt,
         ]; //之前就已经定好返回的为json格式
-=======
-        $body = $this -> _getBodyParams(); //josn格式，直接拿是拿不到的
-        if($this ->_setupResource() == 1){
-        $name = $this -> _userLogin($body['username'],$body['password']);
-        $jwt = $this -> encode($name);
-        echo $jwt;
-        return $jwt;
->>>>>>> 029d41411ae74c5a9e851de0fb347cd49b25752c
         }else
         return $this -> _user -> register($body['username'],$body['password'],$body['email'],$body['name'],$body['intro'],$body['sex']); //这里是注册
     }
@@ -98,8 +149,38 @@ class Restful
         return json_decode($raw,true); //这里传入的为json格式，但是使用的时候需要转换为php数组,且第二个变量一定要为true
         //TRUE时返回数组，FALSE时返回对象 
     }
+
+    /*头像控制
+    */
+
+    private function _handleImage()
+    {
+        if($this -> _requestMethod !='POST'&&$this -> _requestMethod !='GET'){ //头像的查看或更改
+            throw new Exception('请求方法不被允许',405);
+        }
+        if(empty($this -> _id)){
+            print_r('请求参数错误');
+        }
+        if($this -> _requestMethod=='GET'){
+            $url=[
+                'url' => 'http://localhost/Blog/Image/'.$this->_id
+            ];
+            return $this -> _json($url);
+        }else{
+            if($this -> check()){
+            $body =array();
+            $body = $this -> _getBodyParams();
+            return $this -> _image-> saveimages($this->_id,$body['url']);
+            }else{
+             print_r('验证出错');
+            }
+        }
+    }
     
-    private function _handleArticle()
+    /*控制文章
+    */
+    
+     private function _handleArticle()
     {
         switch($this ->_requestMethod)
         {
@@ -109,11 +190,10 @@ class Restful
             }else{
                 return $this -> _handleArticleView(); //返回一个单独的文章
             }
-<<<<<<< HEAD
             case 'POST':
-            if($this -> check())
+            if($this -> check()){
             return $this -> _handleArticleCreate();
-            else
+            }else
             print_r('验证出错');
             case 'DELETE':
             if($this -> check())
@@ -125,20 +205,6 @@ class Restful
             return $this -> _handleArticleEdit();
             else
             print_r('验证出错');
-            
-=======
-            case 'POST':{
-            if(!$restful -> decode(apache_request_headers();,'6'))return 0;
-            
-            return $this -> _handleArticleCreate();
-            }case 'DELETE':{
-            if(!$restful -> decode(apache_request_headers();,'6'))return 0;
-            return $this -> _handleArticleDelete();
-            }case 'PUT':{
-            if(!$restful -> decode(apache_request_headers();,'6'))return 0;
-            return $this -> _handleArticleEdit();
-            }
->>>>>>> 029d41411ae74c5a9e851de0fb347cd49b25752c
         }
     }
     //添加文章
@@ -253,22 +319,17 @@ class Restful
         return $jwt . '.' . self::signature($jwt, $key, $alg); //这里jwt包括前两个
     }
     //alg要使用hash算法的名字,input为数据,key为密钥
-<<<<<<< HEAD
    public  function signature($input,$key,$alg='sha1')
-=======
-   public  function signature($input,$key,$alg)
->>>>>>> 029d41411ae74c5a9e851de0fb347cd49b25752c
     {
    // return $input1.$key.$alg; 
     return hash_hmac($alg, $input, $key);
     }
-<<<<<<< HEAD
-    public function decode($jwt,$key='6')
+    
+   public function decode($jwt,$key='6')
     {
         $arr = explode(" ",$jwt);
         $jwt = $arr[1];
         $tokens = explode('.',$jwt);//按照.分隔开
-        
         $key = md5($key);
         if (count($tokens) != 3)
             return false;
@@ -293,43 +354,13 @@ class Restful
     $jwt=$header['Authorization'];
     return $this -> decode($jwt);
     }
-=======
-    public function decode($jwt,$key)
-    {
-        $tokens = explode('.', $jwt);//按照.分隔开
-        
-        $key    = md5($key);
-        if (count($tokens) != 3)
-            return false;
-
-        list($header64, $payload64, $sign) = $tokens; //分开放入
-
-        $header = json_decode(base64_decode($header64), JSON_OBJECT_AS_ARRAY);
-        if (empty($header['alg']))
-            return false;
-
-        if (self::signature($header64 . '.' . $payload64, $key, $header['alg']) !== $sign)
-            return false;
-
-        $payload = json_decode(base64_decode($payload64), JSON_OBJECT_AS_ARRAY);
-
-        $time = $_SERVER['REQUEST_TIME'];
-        if (isset($payload['iat']) && $payload['iat'] > $time)
-            return false;
-
-        if (isset($payload['exp']) && $payload['exp'] < $time)
-            return false;
-        return $payload;
-    }
->>>>>>> 029d41411ae74c5a9e851de0fb347cd49b25752c
 }
 $article = new Article($pdo);
 $user = new User($pdo);
-$restful = new Restful($user,$article);
-$restful -> run();
-<<<<<<< HEAD
+$comment = new Comment($pdo);
+$image = new Image($pdo);
+$restful = new Restful($user,$article,$comment,$image);
+$restful->run();
 //获取请求头的数据Authorization
-=======
  //获取请求头的数据Authorization
->>>>>>> 029d41411ae74c5a9e851de0fb347cd49b25752c
 ?>

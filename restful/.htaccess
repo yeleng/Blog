@@ -1,4 +1,4 @@
 RewriteEngine on    //apache的重写文件 
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^(.*$) index.php/$1 [L]s
+RewriteRule ^(.*$) index.php/$1 [L]

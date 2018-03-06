@@ -36,14 +36,14 @@ class Article
         $stmt -> bindParam(':author',$author);
         $stmt -> execute();
         $man = $stmt -> fetch(PDO::FETCH_ASSOC);
-        $sql = 'INSERT INTO `main_info`(`title`,`content`,`author`,`time`,`authorId`) VALUE (:title,:content,:author,:time,:id)';
+        $sql = 'INSERT INTO `main_info`(`title`,`content`,`author`,`time`,`authorId`) VALUE (:title,:content,:author,:time,:authorid)';
         $time = date('Y-m-d',time());
         $stmt = $this -> _db -> prepare($sql);
         $stmt -> bindParam(':title',$title);
         $stmt -> bindParam(':content',$content);
         $stmt -> bindParam(':author',$author);
         $stmt -> bindParam(':time',$time);
-        $stmt -> bindParam(':id',$man['id']);
+        $stmt -> bindParam(':authorid',$man['id']);
         if(!$stmt->execute()){   //如果添加失败
             throw new Exception('发表文章失败',ErrorCode::ARTICLE_CREATE_FAIL);
         }
